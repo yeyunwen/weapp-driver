@@ -30,7 +30,7 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "clean": "node scripts/clean.mjs",
-    "prepare": "npm run build",
+    "prepare": "npm exec --yes --package=typescript@5.9.3 -- tsc -p tsconfig.json",
     "dev": "bun run build && node dist/src/cli.js",
     "setup": "bun run build && node scripts/setup.mjs",
     "skill:install": "node scripts/install-skill.mjs --target codex",
