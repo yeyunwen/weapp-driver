@@ -2,10 +2,10 @@
 
 ## Public installation
 
-Install the runtime from the public GitHub repository:
+Install the runtime from npm:
 
 ```bash
-npm install --global https://github.com/yeyunwen/weapp-driver/archive/refs/tags/v0.1.0.tar.gz
+npm install --global weapp-driver
 ```
 
 Install the Skill for Codex with the Skills CLI:

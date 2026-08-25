@@ -13,7 +13,7 @@
   },
   "type": "module",
   "bin": {
-    "weapp": "./dist/src/cli.js"
+    "weapp": "dist/src/cli.js"
   },
   "exports": {
     ".": "./dist/src/index.js"

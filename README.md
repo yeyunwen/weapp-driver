@@ -9,10 +9,10 @@ Fast, agent-first automation for WeChat Mini Programs. WeApp Driver gives Codex 
 
 Prerequisites: Node.js 20+, WeChat DevTools installed and logged in, CLI/automation access enabled, and a Mini Program project with a valid AppID.
 
-Install the runtime directly from GitHub:
+Install the runtime from npm:
 
 ```bash
-npm install --global https://github.com/yeyunwen/weapp-driver/archive/refs/tags/v0.1.0.tar.gz
+npm install --global weapp-driver
 ```
 
 Install the Skill for Codex:
@@ -38,7 +38,7 @@ weapp CLI        executes automation and keeps project sessions alive
 $weapp-driver    teaches the coding agent how to observe, act, verify, and recover
 ```
 
-The npm registry package has not been published yet. Until the first registry release, the GitHub install above is the supported public runtime installation.
+`weapp-driver@0.1.0` is published under the npm `latest` tag. Pin `weapp-driver@0.1.0` when a reproducible installation is required.
 
 ## Use from Codex
 
