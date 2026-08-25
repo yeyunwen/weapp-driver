@@ -12,7 +12,7 @@ Prerequisites: Node.js 20+, WeChat DevTools installed and logged in, CLI/automat
 Install the runtime directly from GitHub:
 
 ```bash
-npm install --global git+https://github.com/yeyunwen/weapp-driver.git
+npm install --global https://github.com/yeyunwen/weapp-driver/archive/refs/tags/v0.1.0.tar.gz
 ```
 
 Install the Skill for Codex:
