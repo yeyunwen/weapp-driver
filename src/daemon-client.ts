@@ -1,0 +1,38 @@
+import { spawn } from "node:child_process";
+import { fileURLToPath } from "node:url";
+
+import { RpcClient } from "./rpc-client.js";
+import { clientId, sleep } from "./util.js";
+
+export async function connectToDaemon(socketPath: string, options: { autostart?: boolean } = {}) {
+  const client = new RpcClient(socketPath, clientId());
+  try {
+    await client.call("ping");
+    return client;
+  } catch (firstError) {
+    client.close();
+    if (options.autostart === false) throw firstError;
+  }
+
+  const cliPath = fileURLToPath(new URL("./cli.js", import.meta.url));
+  const child = spawn(process.execPath, [cliPath, "daemon", "--socket", socketPath], {
+    detached: true,
+    stdio: "ignore",
+    env: { ...process.env, MINIAPP_AGENT_DAEMON: "1" },
+  });
+  child.unref();
+
+  let lastError: unknown;
+  for (let attempt = 0; attempt < 50; attempt += 1) {
+    await sleep(100);
+    const retry = new RpcClient(socketPath, clientId());
+    try {
+      await retry.call("ping");
+      return retry;
+    } catch (error) {
+      lastError = error;
+      retry.close();
+    }
+  }
+  throw new Error(`Unable to start miniapp-agent daemon: ${String(lastError)}`);
+}

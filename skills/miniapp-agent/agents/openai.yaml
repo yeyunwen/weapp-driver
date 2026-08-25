@@ -1,0 +1,7 @@
+interface:
+  display_name: "Mini Program Agent"
+  short_description: "用持久会话快速测试和调试微信小程序功能"
+  default_prompt: "Use $miniapp-agent to test a WeChat Mini Program flow and report pass/fail evidence."
+
+policy:
+  allow_implicit_invocation: true
