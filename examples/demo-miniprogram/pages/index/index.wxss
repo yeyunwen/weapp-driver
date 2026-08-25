@@ -1,0 +1,30 @@
+.page {
+  display: flex;
+  min-height: 100vh;
+  padding: 64rpx 40rpx;
+  box-sizing: border-box;
+  flex-direction: column;
+  gap: 32rpx;
+}
+
+.title {
+  font-size: 44rpx;
+  font-weight: 600;
+}
+
+input,
+button,
+.message {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+input {
+  padding: 24rpx;
+  background: #ffffff;
+  border-radius: 16rpx;
+}
+
+.message {
+  color: #3370ff;
+}

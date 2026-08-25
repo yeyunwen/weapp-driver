@@ -7,9 +7,9 @@ import type { WechatideCall } from "./types.js";
 import { tryParseJson } from "./util.js";
 
 export async function callWechatide(call: WechatideCall) {
-  const temp = await mkdtemp(join(tmpdir(), "miniapp-agent-wechatide-"));
+  const temp = await mkdtemp(join(tmpdir(), "weapp-driver-wechatide-"));
   try {
-    const args = ["-c", call.clientName || "MiniappAgent", call.tool];
+    const args = ["-c", call.clientName || "WeAppDriver", call.tool];
     for (const [key, value] of Object.entries(call.args || {})) {
       if (value === undefined || value === null || value === false) continue;
       const flag = `--${toKebabCase(key)}`;

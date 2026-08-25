@@ -1,0 +1,6 @@
+<view class="page">
+  <text class="title">WeApp Driver Demo</text>
+  <input id="name" data-testid="name" placeholder="输入名字" value="{{name}}" bindinput="onInput" />
+  <button id="submit" data-testid="submit" loading="{{submitting}}" bindtap="onSubmit">提交</button>
+  <text class="message" data-testid="message">{{message}}</text>
+</view>

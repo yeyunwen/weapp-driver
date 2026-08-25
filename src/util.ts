@@ -8,7 +8,7 @@ export function clientId() {
 
 export function defaultSocketPath() {
   const uid = typeof process.getuid === "function" ? process.getuid() : "user";
-  return process.env.MINIAPP_AGENT_SOCKET || resolve(tmpdir(), `miniapp-agent-${uid}.sock`);
+  return process.env.WEAPP_DRIVER_SOCKET || resolve(tmpdir(), `weapp-driver-${uid}.sock`);
 }
 
 export function resolveProjectPath(input: string) {

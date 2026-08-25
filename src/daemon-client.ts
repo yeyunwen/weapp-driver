@@ -18,7 +18,7 @@ export async function connectToDaemon(socketPath: string, options: { autostart?:
   const child = spawn(process.execPath, [cliPath, "daemon", "--socket", socketPath], {
     detached: true,
     stdio: "ignore",
-    env: { ...process.env, MINIAPP_AGENT_DAEMON: "1" },
+    env: { ...process.env, WEAPP_DRIVER_DAEMON: "1" },
   });
   child.unref();
 
@@ -34,5 +34,5 @@ export async function connectToDaemon(socketPath: string, options: { autostart?:
       retry.close();
     }
   }
-  throw new Error(`Unable to start miniapp-agent daemon: ${String(lastError)}`);
+  throw new Error(`Unable to start weapp-driver daemon: ${String(lastError)}`);
 }

@@ -1,4 +1,4 @@
-await useProject(process.env.MINIAPP_PROJECT)
+await useProject(process.env.WEAPP_PROJECT)
 
 await mini.reLaunch('/pages/form/index')
 const snapshot = await page.snapshot()
@@ -11,5 +11,5 @@ await page.waitForData('submitting', false, { timeoutMs: 10_000 })
 console.log({
   page: await mini.info(),
   errors: await logs.errors(),
-  screenshot: await page.screenshot('/tmp/miniapp-agent-form.png'),
+  screenshot: await page.screenshot('/tmp/weapp-driver-form.png'),
 })

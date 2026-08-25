@@ -1,17 +1,19 @@
 ---
-name: miniapp-agent
-description: Operate and debug WeChat Mini Programs through a fast batch JavaScript runtime with persistent automator-protocol sessions, semantic WXML snapshots, @N element refs, waits, screenshots, logs, wx API calls, and official wechatide tools. Use when an agent needs to inspect a Mini Program page, click or fill elements, reproduce bugs, validate UI flows, collect evidence, or combine DevTools compile/debug/preview actions with runtime automation.
+name: weapp-driver
+description: Drive and debug WeChat Mini Programs through a fast batch JavaScript runtime with persistent automator sessions, semantic WXML snapshots, element refs, waits, logs, screenshots, wx API calls, and official wechatide tools. Use when an agent needs to inspect or operate a Mini Program, reproduce bugs, validate UI flows, or collect runtime evidence.
+category: '测试工具'
+tags: node, typescript, miniapp, wechat
 ---
 
-# miniapp-agent
+# WeApp Driver
 
-Use `miniapp-agent nodejs` to compose multiple Mini Program actions into one JavaScript execution. Prefer this runner over many separate `wechatide` calls for high-frequency page work; use `devtools` helpers for official project, compile, log, preview, upload, and cloud capabilities.
+Use `weapp nodejs` to compose multiple Mini Program actions into one JavaScript execution. Prefer this runner over many separate `wechatide` calls for high-frequency page work; use `devtools` helpers for official project, compile, log, preview, upload, and cloud capabilities.
 
 ## Preconditions
 
 - Require a valid absolute Mini Program project path.
 - Require WeChat DevTools to be installed, logged in, and automation/CLI access enabled.
-- Run `miniapp-agent doctor` only for setup or connection diagnosis, not before every task.
+- Run `weapp doctor` only for setup or connection diagnosis, not before every task.
 - Read [setup.md](references/setup.md) when installation or connection fails.
 
 ## Default workflow
@@ -27,15 +29,15 @@ Use `miniapp-agent nodejs` to compose multiple Mini Program actions into one Jav
 For a connection and page-level smoke check, prefer the built-in command:
 
 ```bash
-miniapp-agent smoke --project /absolute/path/to/miniprogram \
+weapp smoke --project /absolute/path/to/miniprogram \
   --route /pages/index/index \
-  --screenshot /tmp/miniapp-smoke.png
+  --screenshot /tmp/weapp-smoke.png
 ```
 
 For a requested feature flow, translate the acceptance criteria into one batch script. Record assertions with `test.check`, `test.equal`, or `test.match`, then print `test.report(...)`. Include the final route, relevant page data or text, runtime errors, and a screenshot path. Do not claim success from a click completing without verifying the resulting state.
 
 ```bash
-miniapp-agent nodejs <<'EOF'
+weapp nodejs <<'EOF'
 await useProject('/absolute/path/to/miniprogram')
 await mini.reLaunch('/pages/order/detail?id=123')
 
@@ -78,7 +80,7 @@ Read [api.md](references/api.md) for the complete helper surface.
 This Skill may be selected automatically for Mini Program testing requests. The user can force it with a prompt such as:
 
 ```text
-使用 $miniapp-agent 测试 /absolute/path/to/miniprogram：进入商品详情页，点击立即购买，填写收货信息，验证提交后进入确认订单页；不要真实付款。输出每一步 pass/fail、console 错误和截图路径。
+使用 $weapp-driver 测试 /absolute/path/to/miniprogram：进入商品详情页，点击立即购买，填写收货信息，验证提交后进入确认订单页；不要真实付款。输出每一步 pass/fail、console 错误和截图路径。
 ```
 
 Treat exclusions such as “不要真实付款” as hard boundaries. Stop before an action that would create an order, charge money, publish, upload, or otherwise mutate external state unless the user explicitly requested that action.
@@ -103,5 +105,5 @@ Before the first `devtools` call, follow the installed official `wechatide-skill
 - Retry only transient missing/detached elements within the requested timeout.
 - Fail immediately on invalid or multi-match selectors.
 - After a timeout, collect current route, a fresh snapshot, errors, and screenshot before changing strategy.
-- If the automator connection closes, run `miniapp-agent doctor`, verify DevTools is still open, then reuse the project session.
+- If the automator connection closes, run `weapp doctor`, verify DevTools is still open, then reuse the project session.
 - Read [troubleshooting.md](references/troubleshooting.md) for known recovery paths.

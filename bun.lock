@@ -3,7 +3,7 @@
   "configVersion": 0,
   "workspaces": {
     "": {
-      "name": "miniapp-agent",
+      "name": "weapp-driver",
       "dependencies": {
         "ws": "^8.18.3",
       },

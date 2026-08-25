@@ -1,0 +1,5 @@
+page {
+  background: #f5f6f8;
+  color: #1f2329;
+  font-family: sans-serif;
+}

@@ -1,25 +1,36 @@
 {
-  "name": "miniapp-agent",
+  "name": "weapp-driver",
   "version": "0.1.0",
   "packageManager": "bun@1.3.14",
-  "description": "Fast, agent-first automation runtime for WeChat Mini Programs",
+  "description": "Fast automation driver for agent-operated WeChat Mini Programs",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/yeyunwen/weapp-driver.git"
+  },
+  "homepage": "https://github.com/yeyunwen/weapp-driver#readme",
+  "bugs": {
+    "url": "https://github.com/yeyunwen/weapp-driver/issues"
+  },
   "type": "module",
   "bin": {
-    "miniapp-agent": "./dist/src/cli.js"
+    "weapp": "./dist/src/cli.js"
   },
   "exports": {
     ".": "./dist/src/index.js"
   },
   "files": [
     "dist/src",
+    "examples",
     "scripts",
     "skills",
     "README.md",
+    "SECURITY.md",
     "LICENSE"
   ],
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "clean": "node scripts/clean.mjs",
+    "prepare": "npm run build",
     "dev": "bun run build && node dist/src/cli.js",
     "setup": "bun run build && node scripts/setup.mjs",
     "skill:install": "node scripts/install-skill.mjs --target codex",
@@ -27,21 +38,28 @@
     "skill:install:all": "node scripts/install-skill.mjs --target all",
     "test": "bun run build && node --test \"dist/test/**/*.test.js\"",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "skill:validate": "python3 ${CODEX_HOME:-$HOME/.codex}/skills/.system/skill-creator/scripts/quick_validate.py skills/miniapp-agent",
-    "prepublishOnly": "bun run test && bun run skill:validate"
+    "skill:validate": "node scripts/validate-skill.mjs",
+    "skill:discover": "npx --yes skills add . --list",
+    "release:check": "bun run typecheck && bun run test && bun run skill:validate && npm pack --dry-run",
+    "prepublishOnly": "bun run release:check"
   },
   "engines": {
     "node": ">=20"
   },
   "keywords": [
     "wechat",
+    "weapp",
     "miniprogram",
     "automation",
+    "driver",
     "agent",
     "codex",
     "skill"
   ],
   "license": "MIT",
+  "publishConfig": {
+    "access": "public"
+  },
   "dependencies": {
     "ws": "^8.18.3"
   },

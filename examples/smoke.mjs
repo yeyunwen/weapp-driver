@@ -1,4 +1,4 @@
-await useProject(process.env.MINIAPP_PROJECT)
+await useProject(process.env.WEAPP_PROJECT)
 
 console.log(await mini.info())
 console.log(await page.snapshot({ includeLayout: true }))

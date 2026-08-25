@@ -20,7 +20,7 @@ export class RpcClient {
     });
     this.socket.setEncoding("utf8");
     this.socket.on("data", (chunk) => this.onData(String(chunk)));
-    this.socket.on("close", () => this.rejectAll(new Error("miniapp-agent daemon connection closed")));
+    this.socket.on("close", () => this.rejectAll(new Error("weapp-driver daemon connection closed")));
     this.socket.on("error", (error) => this.rejectAll(error));
   }
 

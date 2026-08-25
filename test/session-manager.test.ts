@@ -8,7 +8,7 @@ import { SessionManager } from "../src/session-manager.js";
 import { FakeBackendFactory } from "./fakes.js";
 
 test("session manager reuses connections and enforces ownership", async () => {
-  const project = await mkdtemp(join(tmpdir(), "miniapp-agent-project-"));
+  const project = await mkdtemp(join(tmpdir(), "weapp-driver-project-"));
   const factory = new FakeBackendFactory();
   const manager = new SessionManager(factory);
   try {
@@ -33,7 +33,7 @@ test("session manager reuses connections and enforces ownership", async () => {
 });
 
 test("session manager rejects concurrent clients", async () => {
-  const project = await mkdtemp(join(tmpdir(), "miniapp-agent-project-"));
+  const project = await mkdtemp(join(tmpdir(), "weapp-driver-project-"));
   const manager = new SessionManager(new FakeBackendFactory());
   try {
     await manager.use(project, {}, "a");

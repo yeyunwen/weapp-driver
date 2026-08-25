@@ -1,11 +1,111 @@
-# miniapp-agent
+# WeApp Driver
 
-`miniapp-agent` is an agent-first automation runtime for WeChat Mini Programs. It combines:
+[![CI](https://github.com/yeyunwen/weapp-driver/actions/workflows/ci.yml/badge.svg)](https://github.com/yeyunwen/weapp-driver/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-- a persistent client for the official `miniprogram-automator` WebSocket protocol for high-frequency page actions;
-- official `wechatide` commands for project lifecycle, compilation, logs, preview, upload, and cloud operations;
-- an ego-style JavaScript batch runner so an agent can observe, act, wait, verify, and report in one tool call;
-- semantic WXML snapshots with short-lived `@N` element refs and stable locator hints.
+Fast, agent-first automation for WeChat Mini Programs. WeApp Driver gives Codex and other coding agents a persistent Mini Program session, compact semantic WXML snapshots, short-lived `@N` element refs, waits, assertions, logs, screenshots, wx API calls, and official `wechatide` controls.
+
+## 30-second install
+
+Prerequisites: Node.js 20+, WeChat DevTools installed and logged in, CLI/automation access enabled, and a Mini Program project with a valid AppID.
+
+Install the runtime directly from GitHub:
+
+```bash
+npm install --global git+https://github.com/yeyunwen/weapp-driver.git
+```
+
+Install the Skill for Codex:
+
+```bash
+npx --yes skills add yeyunwen/weapp-driver \
+  --skill weapp-driver \
+  --agent codex \
+  --global \
+  --yes
+```
+
+Verify the local runtime and official DevTools CLI:
+
+```bash
+weapp doctor
+```
+
+The two installs serve different purposes:
+
+```text
+weapp CLI        executes automation and keeps project sessions alive
+$weapp-driver    teaches the coding agent how to observe, act, verify, and recover
+```
+
+The npm registry package has not been published yet. Until the first registry release, the GitHub install above is the supported public runtime installation.
+
+## Use from Codex
+
+Start a new task after installing the Skill:
+
+```text
+使用 $weapp-driver 测试 /absolute/path/to/miniprogram：
+进入 /pages/order/create，选择第一个地址并提交，验证进入确认页；
+不要真实支付。输出逐步 pass/fail、console 错误和截图路径。
+```
+
+The Agent will inspect the page before acting, compose dependent actions into a small number of batch executions, wait for observable state changes, and verify the result instead of treating a successful click as a successful test.
+
+## Terminal quick start
+
+Run a connection and page-level smoke test:
+
+```bash
+weapp smoke \
+  --project /absolute/path/to/miniprogram \
+  --route /pages/index/index \
+  --screenshot /tmp/weapp-smoke.png
+```
+
+Run a composed workflow:
+
+```bash
+weapp nodejs <<'EOF'
+await useProject('/absolute/path/to/miniprogram')
+await mini.reLaunch('/pages/index/index')
+
+console.log(await page.snapshot({ includeLayout: true }))
+await page.click('@1')
+await page.waitForData('loading', false, { timeoutMs: 10_000 })
+
+test.check('no runtime errors', (await logs.errors()).length === 0)
+console.log(JSON.stringify(test.report({
+  info: await mini.info(),
+  screenshot: await page.screenshot('/tmp/weapp-result.png'),
+}), null, 2))
+EOF
+```
+
+Set a default project when running several scripts:
+
+```bash
+export WEAPP_PROJECT=/absolute/path/to/miniprogram
+weapp run ./examples/smoke.mjs
+```
+
+## Demo Mini Program
+
+The repository includes a small form flow with stable QA selectors:
+
+```text
+examples/demo-miniprogram/
+examples/demo-flow.mjs
+```
+
+Clone the repository, replace `touristappid` in `examples/demo-miniprogram/project.config.json` with an AppID you are allowed to use, then run:
+
+```bash
+export WEAPP_PROJECT="$PWD/examples/demo-miniprogram"
+weapp run "$PWD/examples/demo-flow.mjs"
+```
+
+The demo fills a name, submits the form, waits for page data, verifies the greeting, checks runtime errors, and writes a screenshot to `/tmp/weapp-driver-demo.png`.
 
 ## Architecture
 
@@ -13,7 +113,7 @@
 Codex / Claude / Cursor
         |
         v
-miniapp-agent nodejs <<'EOF'
+weapp nodejs <<'EOF'
   composed JavaScript workflow
 EOF
         |
@@ -26,172 +126,101 @@ persistent local daemon
 WeChat DevTools
 ```
 
-The daemon keeps one reusable connection per Mini Program project. CLI invocations are short-lived, but project sessions, log cursors, and snapshot refs live in the daemon. The protocol client is implemented locally with modern `ws`; it does not install the official SDK's obsolete image-decoding dependency tree.
-
-## Requirements
-
-- Node.js 20 or newer.
-- WeChat DevTools installed and logged in.
-- DevTools security settings must allow CLI/automation access.
-- A valid Mini Program project with `project.config.json` and AppID.
-- `wechatide` on `PATH` for control-plane helpers.
-
-## Why this has a `package.json`
-
-This is a JavaScript/TypeScript tool package, not an npm-service dependency. Bun also uses `package.json` for dependency resolution, scripts, the `miniapp-agent` executable, and the importable SDK entrypoint. Publishing to the npm registry is optional; local development and Codex usage work through `bun link`.
-
-The runtime is packaged separately from the Skill because the Skill tells Codex **how and when** to test, while the package provides the executable code that actually maintains sessions and controls DevTools.
-
-## Install and build
-
-```bash
-bun install
-bun run setup
-```
-
-`bun run setup` builds the CLI, runs `bun link`, and installs the included Skill as a symlink under `~/.codex/skills/miniapp-agent`. The symlink keeps Skill edits immediately visible to Codex. Manual alternatives are:
-
-```bash
-ln -s "$(pwd)/skills/miniapp-agent" ~/.codex/skills/miniapp-agent
-# or: bunx skills add ./skills/miniapp-agent
-```
-
-Installation into `~/.agents/skills` is optional and intended for other Agent clients that scan that shared directory:
-
-```bash
-bun run skill:install          # Codex only; default
-bun run skill:install:agents   # shared Agent directory only
-bun run skill:install:all      # both directories
-```
-
-Do not install into both roots merely for Codex: duplicate discovery can produce two entries with the same Skill name.
-
-## First run
-
-```bash
-miniapp-agent doctor
-```
-
-With a valid project, run the built-in smoke test:
-
-```bash
-miniapp-agent smoke \
-  --project /absolute/path/to/miniprogram \
-  --route /pages/index/index \
-  --screenshot /tmp/miniapp-smoke.png
-```
-
-It reports runtime info, a semantic page snapshot, buffered errors, a screenshot path, and an overall `ok` value.
-
-Run a composed browser-like workflow:
-
-```bash
-miniapp-agent nodejs <<'EOF'
-await useProject('/absolute/path/to/miniprogram')
-
-await mini.reLaunch('/pages/index/index')
-console.log(await page.snapshot({ includeLayout: true }))
-
-await page.click('@1')
-await page.fill('loc=css:[data-testid="reason"]', '商品信息有误')
-await page.waitForData('submitting', false)
-
-console.log({
-  info: await mini.info(),
-  errors: await logs.errors(),
-  screenshot: await page.screenshot('/tmp/miniapp-result.png'),
-})
-EOF
-```
-
-Set `MINIAPP_PROJECT` to avoid repeating the project path:
-
-```bash
-export MINIAPP_PROJECT=/absolute/path/to/miniprogram
-miniapp-agent nodejs <<'EOF'
-console.log(await page.snapshot())
-EOF
-```
+The daemon keeps one reusable connection per Mini Program project. CLI invocations are short-lived, while project sessions, log cursors, and snapshot refs remain available for later rounds. The local socket is created with permissions restricted to the current user.
 
 ## Helper surface
 
-- Sessions: `useProject`, `claimProject`, `handOffProject`, `completeProject`, `listProjectSessions`
-- Recovery: `resetProject` disconnects and removes a stale project session so the next `useProject` reconnects.
-- Runtime: `mini.info`, `navigate`, `goto`, `reLaunch`, `back`, `evaluate`, `callWx`, `mockWx`, `screenshot`
-- Page: `snapshot`, `query`, `click`, `fill`, `text`, `data`, `setData`, `callMethod`, `waitFor*`
+- Sessions: `useProject`, `claimProject`, `handOffProject`, `completeProject`, `resetProject`, `listProjectSessions`
+- Runtime: `mini.info`, `navigate`, `goto`, `reLaunch`, `switchTab`, `back`, `evaluate`, `callWx`, `mockWx`, `restoreWx`, `screenshot`, `scrollTo`
+- Page: `snapshot`, `query`, `click`, `fill`, `text`, `value`, `wxml`, `attribute`, `style`, `data`, `setData`, `callMethod`, `waitFor*`
 - Logs: `logs.read`, `logs.errors`
-- Official tools: `devtools.call` plus `refresh`, `openPage`, `console`, `network`, `preview`, `upload`
+- Official tools: `devtools.call`, `refresh`, `openPage`, `console`, `network`, `preview`, `upload`
 - Assertions: `test.check`, `test.equal`, `test.match`, `test.report`
 
-## Use from Codex
+Snapshot refs are valid only for the most recent snapshot or query in that project session. Prefer emitted `loc=css:...` values when a target must survive a re-render.
 
-Start a new Codex turn after setup, then describe the feature and acceptance criteria. Explicit invocation is available when you want deterministic routing:
+## Safety boundaries
 
-```text
-使用 $miniapp-agent 测试 /absolute/path/to/miniprogram：
-进入 /pages/order/create，选择第一个地址并提交，验证进入确认页；
-不要真实支付。输出逐步 pass/fail、console 错误和截图路径。
+Page actions can call real backend APIs. Use a dedicated test account and non-production environment.
+
+- Treat “do not pay”, “do not submit”, and similar exclusions as hard boundaries.
+- Preview, upload, publishing, and cloud mutations remain behind official `wechatide` authorization and confirmation.
+- WeApp Driver does not bypass DevTools security settings or official confirmation flows.
+- Do not commit AppIDs, account tickets, tokens, or production credentials in automation scripts.
+- Review third-party Skills before installation; Skills run with the permissions granted to the Agent.
+
+See [SECURITY.md](SECURITY.md) for vulnerability reporting and operational guidance.
+
+## Compatibility
+
+| Component | Status |
+| --- | --- |
+| macOS + WeChat DevTools | Verified locally with `wechatide` 0.3.9 |
+| Windows + WeChat DevTools | CLI path support is implemented; real-device integration is not yet verified |
+| Linux | Not currently verified; requires a working WeChat DevTools CLI on `PATH` |
+| Node.js | 20 or newer |
+| Bun | 1.3.14 for repository development |
+| Codex Skill installation | Verified with `npx skills add ... --agent codex --global` |
+
+Real-app compatibility still depends on the installed DevTools version, base library, native components, and the public surface exposed by the automator protocol.
+
+## Troubleshooting
+
+### `weapp doctor` cannot find `wechatide`
+
+Install or update WeChat DevTools, enable CLI/automation access in its security settings, and make sure `wechatide` is available on `PATH`.
+
+### Automator connection closes
+
+Keep the DevTools project window open. Start a new CLI round and call `resetProject(projectPath)` before reconnecting if the session is stale.
+
+### `SESSION_BUSY`
+
+Another Agent process owns the same project session. Wait for it to finish; do not silently switch daemon ports.
+
+### `SESSION_USER_IN_CONTROL`
+
+The session was handed to the user. Continue only after explicit confirmation, then call `claimProject(projectPath)`.
+
+### Elements are missing or ambiguous
+
+Capture a fresh snapshot, verify the current route, and prefer stable `id`, `data-testid`, or `data-qa` attributes. Reduce `maxElements` or narrow the selector for large pages.
+
+The bundled Skill includes more detailed setup and troubleshooting references.
+
+## Install from source
+
+For contributors using Bun:
+
+```bash
+git clone https://github.com/yeyunwen/weapp-driver.git
+cd weapp-driver
+bun install --frozen-lockfile
+bun run setup
 ```
 
-Codex will inspect the page first, compose the required actions into a small number of batch executions, wait for observable state changes, and verify the result instead of treating a successful click as a successful test.
-
-Snapshot refs are valid only for the most recent snapshot/query in that project session. Prefer emitted `loc=css:...` values when a target must survive a re-render.
-
-## Official DevTools control plane
-
-The generic escape hatch accepts any registered `wechatide` tool:
-
-```js
-await devtools.call('compile_wxml', {
-  file: '/absolute/path/to/pages/index/index.wxml',
-})
-
-const network = await devtools.network("grep -i '/api/order'")
-```
-
-Interactive or destructive `wechatide` operations still use the official authorization and confirmation model. `miniapp-agent` does not bypass it.
-
-Before the first `devtools` call in a task, follow the installed official `wechatide-skill` readiness/version/token gate. The batch runner intentionally does not duplicate or weaken that policy.
-
-## Session ownership
-
-Only one agent process may control a project session at a time. For manual user interaction:
-
-```js
-await handOffProject()
-```
-
-After the user explicitly confirms that the agent may continue:
-
-```js
-await claimProject('/absolute/path/to/miniprogram')
-```
-
-Close a persistent automator connection when a task is genuinely finished:
-
-```js
-await completeProject({ keep: false })
-```
+`bun run setup` builds the runtime, registers the local `weapp` command with `bun link`, and symlinks the bundled Skill into `~/.codex/skills/weapp-driver`.
 
 ## Development
 
 ```bash
-bun run test
 bun run typecheck
+bun run test
 bun run skill:validate
+bun run skill:discover
+bun run release:check
 ```
 
-Stop the background daemon without closing WeChat DevTools:
-
-```bash
-miniapp-agent stop
-```
-
-The test suite uses an in-memory fake Mini Program backend and exercises semantic snapshots, ref expiry, ownership, persistent daemon RPC, and a complete batch script.
+The test suite uses an in-memory fake Mini Program backend and exercises the automator WebSocket protocol, semantic snapshots, ref expiry, assertions, project ownership, persistent daemon RPC, and a complete batch workflow.
 
 ## Current boundaries
 
-- Snapshot generation uses the public `miniprogram-automator` element API. Large pages may require a lower `maxElements` or a narrower selector.
-- Native/custom components may expose incomplete WXML or text.
-- DevTools project isolation is session/lock based; it is not equivalent to ego-lite's Chromium-level Spaces.
-- Network capture from `miniprogram-automator` is not public, so network diagnostics use official `wechatide` tools.
+- The real WeChat DevTools integration still needs broader AppID and DevTools-version coverage.
+- Native and custom components may expose incomplete WXML or text.
+- DevTools project isolation is session/lock based; it is not equivalent to Chromium-level process isolation.
+- Network capture is not public in `miniprogram-automator`, so network diagnostics use official `wechatide` tools.
+- WeApp Driver is an agent-oriented interaction and debugging layer, not a replacement for component unit tests or a full CI regression framework.
+
+## License
+
+MIT

@@ -1,15 +1,41 @@
 # Setup
 
-## Install the runtime
+## Public installation
 
-From the `miniapp-agent` repository, run the idempotent local setup:
+Install the runtime from the public GitHub repository:
+
+```bash
+npm install --global git+https://github.com/yeyunwen/weapp-driver.git
+```
+
+Install the Skill for Codex with the Skills CLI:
+
+```bash
+npx --yes skills add yeyunwen/weapp-driver \
+  --skill weapp-driver \
+  --agent codex \
+  --global \
+  --yes
+```
+
+The runtime and Skill are separate: `weapp` executes automation, while `$weapp-driver` tells the agent how to use it safely.
+
+Verify:
+
+```bash
+weapp doctor
+```
+
+## Repository development
+
+From the `weapp-driver` repository, run the idempotent local setup:
 
 ```bash
 bun install
 bun run setup
 ```
 
-This builds the runtime, registers the `miniapp-agent` CLI with Bun, and symlinks the bundled Skill into `${CODEX_HOME:-~/.codex}/skills/miniapp-agent`.
+This builds the runtime, registers the `weapp` CLI with Bun, and symlinks the bundled Skill into `${CODEX_HOME:-~/.codex}/skills/weapp-driver`.
 
 Codex only needs the `~/.codex/skills` installation. If another Agent client scans the shared `~/.agents/skills` convention, install that target explicitly:
 
@@ -27,24 +53,18 @@ bun run skill:install:all      # both, only when both clients need it
 
 Avoid `all` when the same client scans both roots, because duplicate Skill names may be displayed twice. The installer never overwrites an existing directory or a symlink pointing elsewhere.
 
-Verify:
-
-```bash
-miniapp-agent doctor
-```
-
 ## Manual Skill installation
 
 Only use this when the setup script cannot be used:
 
 ```bash
-ln -s /absolute/path/to/miniapp-agent/skills/miniapp-agent ~/.codex/skills/miniapp-agent
+ln -s /absolute/path/to/weapp-driver/skills/weapp-driver ~/.codex/skills/weapp-driver
 ```
 
 or:
 
 ```bash
-bunx skills add /absolute/path/to/miniapp-agent/skills/miniapp-agent
+bunx skills add /absolute/path/to/weapp-driver/skills/weapp-driver
 ```
 
 ## WeChat DevTools
@@ -56,7 +76,7 @@ Require:
 - `wechatide` available on `PATH` for control-plane operations.
 - A project containing valid `project.config.json` and AppID.
 
-Use `MINIAPP_PROJECT` for a default project and `MINIAPP_AGENT_SOCKET` to override the daemon socket.
+Use `WEAPP_PROJECT` for a default project and `WEAPP_DRIVER_SOCKET` to override the daemon socket.
 
 ## Connection modes
 

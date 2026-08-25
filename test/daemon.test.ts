@@ -4,18 +4,18 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import test from "node:test";
 
-import { MiniappAgentDaemon } from "../src/daemon.js";
+import { WeAppDriverDaemon } from "../src/daemon.js";
 import { RpcClient } from "../src/rpc-client.js";
 import { executeScript } from "../src/script-runner.js";
 import { FakeBackendFactory } from "./fakes.js";
 
 test("daemon supports a complete batch automation flow", async () => {
-  const directory = await mkdtemp(join(tmpdir(), "miniapp-agent-e2e-"));
+  const directory = await mkdtemp(join(tmpdir(), "weapp-driver-e2e-"));
   const project = join(directory, "project");
   const socket = join(directory, "daemon.sock");
   await import("node:fs/promises").then(({ mkdir }) => mkdir(project));
   const factory = new FakeBackendFactory();
-  const daemon = new MiniappAgentDaemon(socket, factory);
+  const daemon = new WeAppDriverDaemon(socket, factory);
   await daemon.start();
   const client = new RpcClient(socket, "test-client");
   const output: unknown[] = [];

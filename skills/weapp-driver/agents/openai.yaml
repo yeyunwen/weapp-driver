@@ -1,0 +1,7 @@
+interface:
+  display_name: "WeApp Driver"
+  short_description: "使用持久会话、语义快照和开发者工具能力测试调试微信小程序"
+  default_prompt: "Use $weapp-driver to test a WeChat Mini Program flow and report pass/fail evidence."
+
+policy:
+  allow_implicit_invocation: true

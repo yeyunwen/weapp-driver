@@ -3,27 +3,27 @@ import { readFile } from "node:fs/promises";
 import { stdin as input } from "node:process";
 import { spawn } from "node:child_process";
 
-import { MiniappAgentDaemon } from "./daemon.js";
+import { WeAppDriverDaemon } from "./daemon.js";
 import { connectToDaemon } from "./daemon-client.js";
 import { executeScript } from "./script-runner.js";
 import { defaultSocketPath } from "./util.js";
 
-const HELP = `miniapp-agent
+const HELP = `weapp
 
 Agent-first batch automation for WeChat Mini Programs.
 
 Usage:
-  miniapp-agent nodejs [--project /absolute/project] < script.js
-  miniapp-agent run path/to/script.js [--project /absolute/project]
-  miniapp-agent smoke --project /absolute/project [--route /pages/index/index] [--screenshot /tmp/result.png]
-  miniapp-agent sessions
-  miniapp-agent stop
-  miniapp-agent doctor
-  miniapp-agent daemon [--socket /tmp/miniapp-agent.sock]
+  weapp nodejs [--project /absolute/project] < script.js
+  weapp run path/to/script.js [--project /absolute/project]
+  weapp smoke --project /absolute/project [--route /pages/index/index] [--screenshot /tmp/result.png]
+  weapp sessions
+  weapp stop
+  weapp doctor
+  weapp daemon [--socket /tmp/weapp-driver.sock]
 
 Environment:
-  MINIAPP_AGENT_SOCKET    Override the daemon Unix socket.
-  MINIAPP_PROJECT         Default project for nodejs/run.
+  WEAPP_DRIVER_SOCKET     Override the daemon Unix socket.
+  WEAPP_PROJECT           Default project for nodejs/run.
 `;
 
 void main().catch((error) => {
@@ -39,7 +39,7 @@ async function main() {
   }
   const socketPath = valueAfter(argv, "--socket") || defaultSocketPath();
   if (command === "daemon") {
-    const daemon = new MiniappAgentDaemon(socketPath);
+    const daemon = new WeAppDriverDaemon(socketPath);
     await daemon.start();
     const shutdown = async () => {
       await daemon.stop();
@@ -69,12 +69,12 @@ async function main() {
     const daemon = await client.call<{ pid: number }>("ping");
     client.close();
     process.kill(daemon.pid, "SIGTERM");
-    process.stdout.write(`Stopped miniapp-agent daemon ${daemon.pid}\n`);
+    process.stdout.write(`Stopped weapp-driver daemon ${daemon.pid}\n`);
     return;
   }
   if (command === "smoke") {
-    const project = valueAfter(argv, "--project") || process.env.MINIAPP_PROJECT;
-    if (!project) throw new Error("miniapp-agent smoke requires --project or MINIAPP_PROJECT");
+    const project = valueAfter(argv, "--project") || process.env.WEAPP_PROJECT;
+    if (!project) throw new Error("weapp smoke requires --project or WEAPP_PROJECT");
     const route = valueAfter(argv, "--route");
     const screenshotPath = valueAfter(argv, "--screenshot");
     const client = await connectToDaemon(socketPath);
@@ -101,7 +101,7 @@ console.log(JSON.stringify(test.report({ info, snapshot, errors, screenshot }), 
     return;
   }
   if (command === "nodejs" || command === "run") {
-    const project = valueAfter(argv, "--project") || process.env.MINIAPP_PROJECT;
+    const project = valueAfter(argv, "--project") || process.env.WEAPP_PROJECT;
     const code = command === "nodejs" ? await readStdin() : await readFile(requiredScript(argv), "utf8");
     if (!code.trim()) throw new Error("No JavaScript was provided");
     const client = await connectToDaemon(socketPath);
@@ -117,7 +117,7 @@ console.log(JSON.stringify(test.report({ info, snapshot, errors, screenshot }), 
 
 function requiredScript(argv: string[]) {
   const path = argv.find((arg) => !arg.startsWith("--") && arg !== valueAfter(argv, "--project") && arg !== valueAfter(argv, "--socket"));
-  if (!path) throw new Error("miniapp-agent run requires a script path");
+  if (!path) throw new Error("weapp run requires a script path");
   return path;
 }
 

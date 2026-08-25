@@ -2,7 +2,7 @@
 
 ## `wechatide` is not found
 
-Install or update WeChat DevTools and ensure its CLI is on `PATH`. Run `miniapp-agent doctor` again.
+Install or update WeChat DevTools and ensure its CLI is on `PATH`. Run `weapp doctor` again.
 
 ## Automator connection closes
 

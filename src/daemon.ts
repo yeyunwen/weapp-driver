@@ -8,7 +8,7 @@ import { RpcHandler } from "./rpc-handler.js";
 import { SessionManager } from "./session-manager.js";
 import type { RpcRequest, RpcResponse } from "./types.js";
 
-export class MiniappAgentDaemon {
+export class WeAppDriverDaemon {
   private readonly sessions: SessionManager;
   private readonly handler: RpcHandler;
   private server: Server | null = null;

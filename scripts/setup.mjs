@@ -9,10 +9,10 @@ await run(process.execPath, ["scripts/install-skill.mjs", "--target", "codex"], 
 
 process.stdout.write(
   [
-    "miniapp-agent is ready.",
-    `CLI: ${await resolveCommand("miniapp-agent")}`,
-    "Next: miniapp-agent doctor",
-    "Codex discovers the Skill on the next turn. Invoke it explicitly with $miniapp-agent if desired.",
+    "weapp-driver is ready.",
+    `CLI: ${await resolveCommand("weapp")}`,
+    "Next: weapp doctor",
+    "Codex discovers the Skill on the next turn. Invoke it explicitly with $weapp-driver if desired.",
   ].join("\n") + "\n",
 );
 

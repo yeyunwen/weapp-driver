@@ -13,7 +13,7 @@ This project provides a batch JavaScript runtime and persistent daemon for agent
 - `src/wechatide.ts`: official DevTools control-plane adapter.
 - `src/snapshot.ts` / `src/refs.ts` / `src/element-resolver.ts`: agent semantic input and target resolution.
 - `src/helpers.ts` / `src/script-runner.ts`: preloaded helper API for composed JavaScript workflows.
-- `skills/miniapp-agent/`: installable Codex/Agent Skill.
+- `skills/weapp-driver/`: installable Codex/Agent Skill.
 
 ## Commands
 

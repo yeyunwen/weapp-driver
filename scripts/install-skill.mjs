@@ -4,11 +4,11 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 const repository = resolve(dirname(fileURLToPath(import.meta.url)), "..");
-const skillSource = join(repository, "skills", "miniapp-agent");
+const skillSource = join(repository, "skills", "weapp-driver");
 const args = process.argv.slice(2);
 
 if (["-h", "--help"].some((flag) => args.includes(flag))) {
-  process.stdout.write(`Install the bundled miniapp-agent Skill with a safe symlink.\n\nUsage:\n  node scripts/install-skill.mjs [--target codex|agents|all]\n`);
+  process.stdout.write(`Install the bundled weapp-driver Skill with a safe symlink.\n\nUsage:\n  node scripts/install-skill.mjs [--target codex|agents|all]\n`);
   process.exit(0);
 }
 
@@ -24,7 +24,7 @@ const roots = {
 const selected = targetName === "all" ? ["codex", "agents"] : [targetName];
 
 for (const name of selected) {
-  const target = join(roots[name], "skills", "miniapp-agent");
+  const target = join(roots[name], "skills", "weapp-driver");
   const status = await installSkillLink(skillSource, target);
   process.stdout.write(`${name}: ${status} ${target} -> ${skillSource}\n`);
 }

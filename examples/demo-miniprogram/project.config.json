@@ -1,0 +1,10 @@
+{
+  "appid": "touristappid",
+  "compileType": "miniprogram",
+  "projectname": "weapp-driver-demo",
+  "setting": {
+    "es6": true,
+    "enhance": true,
+    "postcss": true
+  }
+}

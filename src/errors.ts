@@ -1,16 +1,16 @@
 export type ResolutionKind = "transient" | "ambiguous" | "invalid" | "detached";
 
-export class MiniappAgentError extends Error {
+export class WeAppDriverError extends Error {
   code?: string;
 
   constructor(message: string, code?: string) {
     super(message);
-    this.name = "MiniappAgentError";
+    this.name = "WeAppDriverError";
     this.code = code;
   }
 }
 
-export class ElementResolutionError extends MiniappAgentError {
+export class ElementResolutionError extends WeAppDriverError {
   kind: ResolutionKind;
 
   constructor(message: string, kind: ResolutionKind) {
@@ -20,14 +20,14 @@ export class ElementResolutionError extends MiniappAgentError {
   }
 }
 
-export class OwnershipError extends MiniappAgentError {
+export class OwnershipError extends WeAppDriverError {
   constructor(message: string) {
     super(message, "SESSION_USER_IN_CONTROL");
     this.name = "OwnershipError";
   }
 }
 
-export class SessionBusyError extends MiniappAgentError {
+export class SessionBusyError extends WeAppDriverError {
   constructor(message: string) {
     super(message, "SESSION_BUSY");
     this.name = "SessionBusyError";
@@ -47,7 +47,7 @@ export function serializeError(error: unknown) {
 }
 
 export function reviveError(error: NonNullable<import("./types.js").RpcResponse["error"]>) {
-  const value = new MiniappAgentError(error.message, error.code);
+  const value = new WeAppDriverError(error.message, error.code);
   value.name = error.name;
   value.stack = error.stack;
   Object.assign(value, error.kind ? { kind: error.kind } : {});
