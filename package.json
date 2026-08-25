@@ -1,6 +1,6 @@
 {
   "name": "weapp-driver",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "packageManager": "bun@1.3.14",
   "description": "Fast automation driver for agent-operated WeChat Mini Programs",
   "repository": {

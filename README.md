@@ -38,7 +38,7 @@ weapp CLI        executes automation and keeps project sessions alive
 $weapp-driver    teaches the coding agent how to observe, act, verify, and recover
 ```
 
-`weapp-driver@0.1.0` is published under the npm `latest` tag. Pin `weapp-driver@0.1.0` when a reproducible installation is required.
+`weapp-driver@0.1.1` is published under the npm `latest` tag. Pin `weapp-driver@0.1.1` when a reproducible installation is required.
 
 ## Use from Codex
 
