@@ -30,7 +30,6 @@
   "scripts": {
     "build": "tsc -p tsconfig.json",
     "clean": "node scripts/clean.mjs",
-    "prepare": "npm exec --yes --package=typescript@5.9.3 -- tsc -p tsconfig.json",
     "dev": "bun run build && node dist/src/cli.js",
     "setup": "bun run build && node scripts/setup.mjs",
     "skill:install": "node scripts/install-skill.mjs --target codex",
@@ -38,9 +37,10 @@
     "skill:install:all": "node scripts/install-skill.mjs --target all",
     "test": "bun run build && node --test \"dist/test/**/*.test.js\"",
     "typecheck": "tsc -p tsconfig.json --noEmit",
+    "build:check": "bun run build && git diff --exit-code -- dist",
     "skill:validate": "node scripts/validate-skill.mjs",
     "skill:discover": "npx --yes skills add . --list",
-    "release:check": "bun run typecheck && bun run test && bun run skill:validate && npm pack --dry-run",
+    "release:check": "bun run typecheck && bun run test && bun run skill:validate && bun run build:check && npm pack --dry-run",
     "prepublishOnly": "bun run release:check"
   },
   "engines": {

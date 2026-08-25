@@ -20,4 +20,5 @@ jobs:
       - run: bun run typecheck
       - run: bun run test
       - run: bun run skill:validate
+      - run: bun run build:check
       - run: npm pack --dry-run
