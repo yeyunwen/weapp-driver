@@ -11,7 +11,14 @@ export declare class RpcHandler {
     private miniNavigate;
     private screenshot;
     private snapshot;
+    private elementCount;
+    private componentQuery;
+    private componentData;
+    private componentSetData;
+    private componentCallMethod;
+    private customComponent;
     private elementAction;
+    private elementProperty;
     private elementRead;
     private waitSelector;
     private waitRoute;

@@ -56,6 +56,8 @@ EOF
 ## Observation and targeting
 
 - Use `page.snapshot()` for a compact semantic page view.
+- Use `page.exists(selector)` or `page.count(selector)` for presence checks. `page.query(selector)` returns a snapshot object even when `refs` is empty; do not use object truthiness as a match check.
+- Treat names in `ref.opaqueAttributes` as lossy WXML serialization. Read the runtime value with `page.property(ref, name)` or, for component state, `component.data(ref)`; do not parse `[object Object]` as JSON.
 - Treat `@N` refs as short-lived: any later snapshot/query rebuilds the valid ref set.
 - Prefer emitted `loc=css:#id`, `data-testid`, or `data-qa` locators across page updates.
 - Use raw CSS when the project already has stable QA selectors.
@@ -70,6 +72,7 @@ Use:
 
 - `mini` for routes, AppService evaluation, wx APIs, screenshot, and scrolling.
 - `page` for snapshot, elements, page data, methods, and waits.
+- `component` for custom-component snapshots, runtime data, `setData`, and methods. Start with a page ref or stable selector; use `component.query(parent, selector)` to enter an opaque component boundary.
 - `logs` for persistent console/exception entries.
 - `devtools` for official `wechatide` operations.
 
@@ -96,14 +99,16 @@ Only one agent process controls a project session at once.
 
 ## Official DevTools operations
 
-Use `devtools.call(tool, args)` for registered official tools. Prefer convenience helpers for refresh, page opening, screenshot, console, network, preview, and upload. Never bypass official authorization or confirmation. Do not repeat pending destructive operations; follow the returned DevTools task state.
+Use `devtools.call(tool, args)` for registered official tools. Prefer convenience helpers for refresh, page opening, screenshot, console, network, preview, and upload. Never bypass official authorization or confirmation. When a call returns `status: "pending"`, stop and surface the authorization request; do not retry it or replace it with repeated page reloads.
 
 Before the first `devtools` call, follow the installed official `wechatide-skill` readiness/version/token gate. Do not invent or hardcode the official Skill version.
 
 ## Failure handling
 
 - Retry only transient missing/detached elements within the requested timeout.
+- Element reads wait up to 5 seconds by default. For an optional element, check `page.exists()` first or pass a shorter `timeoutMs`.
 - Fail immediately on invalid or multi-match selectors.
 - After a timeout, collect current route, a fresh snapshot, errors, and screenshot before changing strategy.
 - If the automator connection closes, run `weapp doctor`, verify DevTools is still open, then reuse the project session.
+- Keep the daemon and project session alive across test rounds. When the default Automator port already belongs to the same AppID, the runtime reuses it instead of launching another authorization flow.
 - Read [troubleshooting.md](references/troubleshooting.md) for known recovery paths.

@@ -58,12 +58,15 @@ export function createHelperContext(client) {
         },
         snapshotRaw: (options = {}) => client.call("page.snapshot", projectParams({ options })),
         query: (selector, options = {}) => client.call("page.query", projectParams({ selector, options })),
+        count: (selector) => client.call("page.count", projectParams({ selector })),
+        exists: (selector) => client.call("page.exists", projectParams({ selector })),
         click: (target, options = {}) => client.call("page.click", projectParams({ target, ...options })),
         fill: (target, value, options = {}) => client.call("page.fill", projectParams({ target, value, ...options })),
         text: (target, options = {}) => client.call("page.text", projectParams({ target, ...options })),
         value: (target, options = {}) => client.call("page.value", projectParams({ target, ...options })),
         wxml: (target, options = {}) => client.call("page.wxml", projectParams({ target, ...options })),
         attribute: (target, name, options = {}) => client.call("page.attribute", projectParams({ target, name, ...options })),
+        property: (target, name, options = {}) => client.call("element.property", projectParams({ target, name, ...options })),
         style: (target, name, options = {}) => client.call("page.style", projectParams({ target, name, ...options })),
         data: (path) => client.call("page.data", projectParams({ path })),
         setData: (data) => client.call("page.setData", projectParams({ data })),
@@ -73,6 +76,22 @@ export function createHelperContext(client) {
         waitForRoute: (route, options = {}) => client.call("wait.route", projectParams({ route, ...options })),
         waitForData: (path, expected, options = {}) => client.call("wait.data", projectParams({ path, expected, ...options })),
         waitForFunction: (source, args = [], options = {}) => client.call("wait.function", projectParams({ source: source.toString(), args, ...options })),
+    };
+    const component = {
+        query: (target, selector, options = {}) => {
+            const { timeoutMs, intervalMs, ...snapshotOptions } = options;
+            return client.call("component.query", projectParams({
+                target,
+                selector,
+                options: snapshotOptions,
+                ...(timeoutMs === undefined ? {} : { timeoutMs }),
+                ...(intervalMs === undefined ? {} : { intervalMs }),
+            }));
+        },
+        data: (target, path, options = {}) => client.call("component.data", projectParams({ target, path, ...options })),
+        property: (target, name, options = {}) => client.call("element.property", projectParams({ target, name, ...options })),
+        setData: (target, data, options = {}) => client.call("component.setData", projectParams({ target, data, ...options })),
+        callMethod: (target, method, args = [], options = {}) => client.call("component.callMethod", projectParams({ target, method, args, ...options })),
     };
     const logs = {
         read: (options = {}) => client.call("logs.read", projectParams({ since: options.since ?? 0 })).then((entries) => options.type ? entries.filter((entry) => entry.type === options.type) : entries),
@@ -115,7 +134,8 @@ export function createHelperContext(client) {
     };
     const helpDocs = {
         useProject: "useProject(projectPath, options?) — connect or reuse a persistent miniprogram-automator session.",
-        page: "page.snapshot/click/fill/text/data/setData/waitForSelector/waitForRoute/waitForData/waitForFunction/screenshot.",
+        page: "page.snapshot/query/exists/count/click/fill/text/property/data/setData/waitForSelector/waitForRoute/waitForData/waitForFunction/screenshot.",
+        component: "component.query/property/data/setData/callMethod inspect and operate custom components.",
         mini: "mini.info/navigate/goto/reLaunch/switchTab/back/evaluate/callWx/mockWx/restoreWx/screenshot/scrollTo.",
         logs: "logs.read({since,type?}) and logs.errors(since?) read the persistent console/exception buffer.",
         devtools: "devtools.call(tool,args) uses official wechatide; convenience helpers include refresh/openPage/screenshot/console/network/preview/upload.",
@@ -130,6 +150,7 @@ export function createHelperContext(client) {
         listProjectSessions: () => client.call("session.list"),
         mini,
         page,
+        component,
         logs,
         devtools,
         test,

@@ -9,6 +9,16 @@ export async function captureSemanticSnapshot(page: MiniPage, registry: RefRegis
   const selector = options.selector || DEFAULT_SELECTOR;
   const maxElements = options.maxElements ?? 300;
   const allElements = await page.$$(selector);
+  return captureSemanticElements(page, allElements, registry, options, maxElements);
+}
+
+export async function captureSemanticElements(
+  page: Pick<MiniPage, "path" | "query">,
+  allElements: MiniElement[],
+  registry: RefRegistry,
+  options: SnapshotOptions = {},
+  maxElements = options.maxElements ?? 300,
+): Promise<SnapshotResult> {
   const elements = allElements.slice(0, maxElements);
   registry.beginSnapshot();
   const refs = await mapLimit(elements, options.concurrency ?? 12, (element) => summarize(element, registry, options));
@@ -33,9 +43,20 @@ async function summarize(element: MiniElement, registry: RefRegistry, options: S
     options.includeLayout ? readBox(element) : Promise.resolve(undefined),
   ]);
   const attributes = parseAttributes(outer);
+  const opaqueAttributes = Object.entries(attributes)
+    .filter(([, value]) => /^\[object [^\]]+\]$/.test(value))
+    .map(([name]) => name);
   const text = normalizeText(rawText || stripMarkup(outer));
   const locator = stableLocator(element.tagName, attributes);
-  return { ref, tag: element.tagName || openingTag(outer) || "element", text, locator, attributes, box };
+  return {
+    ref,
+    tag: element.tagName || openingTag(outer) || "element",
+    text,
+    locator,
+    attributes,
+    ...(opaqueAttributes.length ? { opaqueAttributes } : {}),
+    box,
+  };
 }
 
 function formatElement(element: ElementSummary) {
@@ -46,6 +67,7 @@ function formatElement(element: ElementSummary) {
     .filter(([name]) => ["id", "class", "name", "type", "role", "data-testid", "data-qa", "aria-label"].includes(name))
     .map(([name, value]) => `${name}=${JSON.stringify(value)}`);
   if (attrs.length) parts.push(`[${attrs.join(" ")}]`);
+  if (element.opaqueAttributes?.length) parts.push(`[opaque=${element.opaqueAttributes.join(",")}]`);
   if (element.box) parts.push(`{x:${element.box.x},y:${element.box.y},w:${element.box.width},h:${element.box.height}}`);
   return parts.join(" ");
 }

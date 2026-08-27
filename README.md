@@ -38,7 +38,7 @@ weapp CLI        executes automation and keeps project sessions alive
 $weapp-driver    teaches the coding agent how to observe, act, verify, and recover
 ```
 
-`weapp-driver@0.1.1` is published under the npm `latest` tag. Pin `weapp-driver@0.1.1` when a reproducible installation is required.
+`weapp-driver@0.2.0` is published under the npm `latest` tag. Pin `weapp-driver@0.2.0` when a reproducible installation is required.
 
 ## Use from Codex
 
@@ -132,12 +132,17 @@ The daemon keeps one reusable connection per Mini Program project. CLI invocatio
 
 - Sessions: `useProject`, `claimProject`, `handOffProject`, `completeProject`, `resetProject`, `listProjectSessions`
 - Runtime: `mini.info`, `navigate`, `goto`, `reLaunch`, `switchTab`, `back`, `evaluate`, `callWx`, `mockWx`, `restoreWx`, `screenshot`, `scrollTo`
-- Page: `snapshot`, `query`, `click`, `fill`, `text`, `value`, `wxml`, `attribute`, `style`, `data`, `setData`, `callMethod`, `waitFor*`
+- Page: `snapshot`, `query`, `exists`, `count`, `click`, `fill`, `text`, `value`, `wxml`, `attribute`, `property`, `style`, `data`, `setData`, `callMethod`, `waitFor*`
+- Custom components: `component.query`, `property`, `data`, `setData`, `callMethod`
 - Logs: `logs.read`, `logs.errors`
 - Official tools: `devtools.call`, `refresh`, `openPage`, `console`, `network`, `preview`, `upload`
 - Assertions: `test.check`, `test.equal`, `test.match`, `test.report`
 
 Snapshot refs are valid only for the most recent snapshot or query in that project session. Prefer emitted `loc=css:...` values when a target must survive a re-render.
+
+`page.query()` returns a snapshot result even when no elements match. Check `result.refs.length`, or use `page.exists()` / `page.count()` for presence checks. Use `component.query()` to enter an exposed custom-component boundary before reading its runtime data or calling methods.
+
+Object-valued WXML attributes are exposed by DevTools as strings such as `[object Object]`. Snapshot refs mark these names in `opaqueAttributes`; use `page.property()` or `component.data()` to read the runtime value.
 
 ## Safety boundaries
 

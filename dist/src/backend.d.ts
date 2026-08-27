@@ -1,6 +1,9 @@
 import type { ConsoleEntry, PageSummary, SessionOptions } from "./types.js";
 export interface MiniElement {
     tagName: string;
+    isCustomComponent?: boolean;
+    $?(selector: string): Promise<MiniElement | null>;
+    $$?(selector: string): Promise<MiniElement[]>;
     text(): Promise<string>;
     outerWxml(): Promise<string>;
     offset(): Promise<Record<string, unknown>>;
@@ -16,6 +19,9 @@ export interface MiniElement {
     property(name: string): Promise<unknown>;
     value(): Promise<unknown>;
     wxml(): Promise<string>;
+    data?(path?: string): Promise<unknown>;
+    setData?(data: unknown): Promise<void>;
+    callMethod?(method: string, ...args: unknown[]): Promise<unknown>;
 }
 export interface MiniPage {
     path: string;

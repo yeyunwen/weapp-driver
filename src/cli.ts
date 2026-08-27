@@ -16,6 +16,7 @@ Usage:
   weapp nodejs [--project /absolute/project] < script.js
   weapp run path/to/script.js [--project /absolute/project]
   weapp smoke --project /absolute/project [--route /pages/index/index] [--screenshot /tmp/result.png]
+  weapp --version
   weapp sessions
   weapp stop
   weapp doctor
@@ -35,6 +36,13 @@ async function main() {
   const [command = "help", ...argv] = process.argv.slice(2);
   if (["help", "-h", "--help"].includes(command)) {
     process.stdout.write(HELP);
+    return;
+  }
+  if (["version", "-v", "--version"].includes(command)) {
+    const packageJson = JSON.parse(
+      await readFile(new URL("../../package.json", import.meta.url), "utf8"),
+    ) as { version?: string };
+    process.stdout.write(`${packageJson.version || "unknown"}\n`);
     return;
   }
   const socketPath = valueAfter(argv, "--socket") || defaultSocketPath();

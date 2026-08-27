@@ -1,5 +1,5 @@
 import type { RpcClient } from "./rpc-client.js";
-import type { SessionOptions, SnapshotOptions, WaitOptions, WechatideCall } from "./types.js";
+import type { SessionOptions, SnapshotOptions, SnapshotResult, WaitOptions, WechatideCall } from "./types.js";
 export type HelperRuntime = ReturnType<typeof createHelperContext>;
 export declare function createHelperContext(client: RpcClient): {
     useProject: (projectPath: string, options?: SessionOptions) => Promise<{
@@ -31,13 +31,16 @@ export declare function createHelperContext(client: RpcClient): {
     page: {
         snapshot: (options?: SnapshotOptions) => Promise<string>;
         snapshotRaw: (options?: SnapshotOptions) => Promise<unknown>;
-        query: (selector: string, options?: Omit<SnapshotOptions, "selector">) => Promise<unknown>;
+        query: (selector: string, options?: Omit<SnapshotOptions, "selector">) => Promise<SnapshotResult>;
+        count: (selector: string) => Promise<number>;
+        exists: (selector: string) => Promise<boolean>;
         click: (target: string, options?: WaitOptions) => Promise<unknown>;
         fill: (target: string, value: string, options?: WaitOptions) => Promise<unknown>;
         text: (target: string, options?: WaitOptions) => Promise<string>;
         value: (target: string, options?: WaitOptions) => Promise<unknown>;
         wxml: (target: string, options?: WaitOptions) => Promise<string>;
         attribute: (target: string, name: string, options?: WaitOptions) => Promise<string>;
+        property: (target: string, name: string, options?: WaitOptions) => Promise<unknown>;
         style: (target: string, name: string, options?: WaitOptions) => Promise<string>;
         data: (path?: string) => Promise<unknown>;
         setData: (data: unknown) => Promise<unknown>;
@@ -47,6 +50,13 @@ export declare function createHelperContext(client: RpcClient): {
         waitForRoute: (route: string, options?: WaitOptions) => Promise<unknown>;
         waitForData: (path: string, expected: unknown, options?: WaitOptions) => Promise<unknown>;
         waitForFunction: (source: string | Function, args?: unknown[], options?: WaitOptions) => Promise<unknown>;
+    };
+    component: {
+        query: (target: string, selector: string, options?: Omit<SnapshotOptions, "selector"> & WaitOptions) => Promise<SnapshotResult>;
+        data: (target: string, path?: string, options?: WaitOptions) => Promise<unknown>;
+        property: (target: string, name: string, options?: WaitOptions) => Promise<unknown>;
+        setData: (target: string, data: unknown, options?: WaitOptions) => Promise<unknown>;
+        callMethod: (target: string, method: string, args?: unknown[], options?: WaitOptions) => Promise<unknown>;
     };
     logs: {
         read: (options?: {

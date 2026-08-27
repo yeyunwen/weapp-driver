@@ -27,6 +27,7 @@ export type ElementSummary = {
     text: string;
     locator?: string;
     attributes: Record<string, string>;
+    opaqueAttributes?: string[];
     box?: LayoutBox;
 };
 export type LayoutBox = {

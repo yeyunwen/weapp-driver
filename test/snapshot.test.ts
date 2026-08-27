@@ -7,6 +7,7 @@ import { FakePage } from "./fakes.js";
 
 test("semantic snapshot emits refs, stable locators, text, and layout", async () => {
   const page = new FakePage();
+  page.elements[2]!.attrs.config = "[object Object]";
   const registry = new RefRegistry();
   const snapshot = await captureSemanticSnapshot(page, registry, { includeLayout: true });
 
@@ -15,6 +16,8 @@ test("semantic snapshot emits refs, stable locators, text, and layout", async ()
   assert.match(snapshot.content, /@2 input/);
   assert.match(snapshot.content, /data-testid/);
   assert.match(snapshot.content, /\{x:10,y:20,w:120,h:44\}/);
+  assert.match(snapshot.content, /opaque=config/);
+  assert.deepEqual(snapshot.refs[2]?.opaqueAttributes, ["config"]);
   assert.equal(registry.resolve("@1"), page.elements[0]);
 });
 

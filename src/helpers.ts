@@ -1,5 +1,5 @@
 import type { RpcClient } from "./rpc-client.js";
-import type { SessionOptions, SnapshotOptions, WaitOptions, WechatideCall } from "./types.js";
+import type { SessionOptions, SnapshotOptions, SnapshotResult, WaitOptions, WechatideCall } from "./types.js";
 
 export type HelperRuntime = ReturnType<typeof createHelperContext>;
 
@@ -70,7 +70,9 @@ export function createHelperContext(client: RpcClient) {
     },
     snapshotRaw: (options: SnapshotOptions = {}) => client.call("page.snapshot", projectParams({ options })),
     query: (selector: string, options: Omit<SnapshotOptions, "selector"> = {}) =>
-      client.call("page.query", projectParams({ selector, options })),
+      client.call<SnapshotResult>("page.query", projectParams({ selector, options })),
+    count: (selector: string) => client.call<number>("page.count", projectParams({ selector })),
+    exists: (selector: string) => client.call<boolean>("page.exists", projectParams({ selector })),
     click: (target: string, options: WaitOptions = {}) => client.call("page.click", projectParams({ target, ...options })),
     fill: (target: string, value: string, options: WaitOptions = {}) =>
       client.call("page.fill", projectParams({ target, value, ...options })),
@@ -79,6 +81,8 @@ export function createHelperContext(client: RpcClient) {
     wxml: (target: string, options: WaitOptions = {}) => client.call<string>("page.wxml", projectParams({ target, ...options })),
     attribute: (target: string, name: string, options: WaitOptions = {}) =>
       client.call<string>("page.attribute", projectParams({ target, name, ...options })),
+    property: (target: string, name: string, options: WaitOptions = {}) =>
+      client.call("element.property", projectParams({ target, name, ...options })),
     style: (target: string, name: string, options: WaitOptions = {}) =>
       client.call<string>("page.style", projectParams({ target, name, ...options })),
     data: (path?: string) => client.call("page.data", projectParams({ path })),
@@ -92,6 +96,31 @@ export function createHelperContext(client: RpcClient) {
       client.call("wait.data", projectParams({ path, expected, ...options })),
     waitForFunction: (source: string | Function, args: unknown[] = [], options: WaitOptions = {}) =>
       client.call("wait.function", projectParams({ source: source.toString(), args, ...options })),
+  };
+
+  const component = {
+    query: (
+      target: string,
+      selector: string,
+      options: Omit<SnapshotOptions, "selector"> & WaitOptions = {},
+    ) => {
+      const { timeoutMs, intervalMs, ...snapshotOptions } = options;
+      return client.call<SnapshotResult>("component.query", projectParams({
+        target,
+        selector,
+        options: snapshotOptions,
+        ...(timeoutMs === undefined ? {} : { timeoutMs }),
+        ...(intervalMs === undefined ? {} : { intervalMs }),
+      }));
+    },
+    data: (target: string, path?: string, options: WaitOptions = {}) =>
+      client.call("component.data", projectParams({ target, path, ...options })),
+    property: (target: string, name: string, options: WaitOptions = {}) =>
+      client.call("element.property", projectParams({ target, name, ...options })),
+    setData: (target: string, data: unknown, options: WaitOptions = {}) =>
+      client.call("component.setData", projectParams({ target, data, ...options })),
+    callMethod: (target: string, method: string, args: unknown[] = [], options: WaitOptions = {}) =>
+      client.call("component.callMethod", projectParams({ target, method, args, ...options })),
   };
 
   const logs = {
@@ -147,7 +176,8 @@ export function createHelperContext(client: RpcClient) {
 
   const helpDocs: Record<string, string> = {
     useProject: "useProject(projectPath, options?) — connect or reuse a persistent miniprogram-automator session.",
-    page: "page.snapshot/click/fill/text/data/setData/waitForSelector/waitForRoute/waitForData/waitForFunction/screenshot.",
+    page: "page.snapshot/query/exists/count/click/fill/text/property/data/setData/waitForSelector/waitForRoute/waitForData/waitForFunction/screenshot.",
+    component: "component.query/property/data/setData/callMethod inspect and operate custom components.",
     mini: "mini.info/navigate/goto/reLaunch/switchTab/back/evaluate/callWx/mockWx/restoreWx/screenshot/scrollTo.",
     logs: "logs.read({since,type?}) and logs.errors(since?) read the persistent console/exception buffer.",
     devtools: "devtools.call(tool,args) uses official wechatide; convenience helpers include refresh/openPage/screenshot/console/network/preview/upload.",
@@ -164,6 +194,7 @@ export function createHelperContext(client: RpcClient) {
     listProjectSessions: () => client.call("session.list"),
     mini,
     page,
+    component,
     logs,
     devtools,
     test,

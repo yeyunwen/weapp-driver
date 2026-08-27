@@ -4,6 +4,7 @@ import type { ConsoleEntry, SessionOptions } from "../src/types.js";
 export class FakeElement implements MiniElement {
   valueState: unknown = "";
   tapped = 0;
+  readonly isCustomComponent: boolean = false;
 
   constructor(
     readonly tagName: string,
@@ -11,6 +12,14 @@ export class FakeElement implements MiniElement {
     private textState: string,
     private readonly box = { left: 0, top: 0, width: 100, height: 30 },
   ) {}
+
+  async $(selector: string) {
+    return (await this.$$(selector))[0] || null;
+  }
+
+  async $$(_selector: string): Promise<FakeElement[]> {
+    return [];
+  }
 
   text() {
     return Promise.resolve(this.textState);
@@ -62,6 +71,50 @@ export class FakeElement implements MiniElement {
   }
 }
 
+export class FakeCustomElement extends FakeElement {
+  override readonly isCustomComponent = true;
+  readonly dataState: Record<string, unknown> = { showTopBar: false, config: { enabled: true } };
+
+  constructor(
+    tagName: string,
+    attrs: Record<string, string>,
+    textState: string,
+    readonly children: FakeElement[] = [],
+  ) {
+    super(tagName, attrs, textState);
+  }
+
+  override async $$(selector: string) {
+    if (selector === "*") return this.children;
+    if (selector.startsWith("#")) {
+      return this.children.filter((element) => element.attrs.id === selector.slice(1));
+    }
+    return this.children.filter((element) => element.tagName === selector);
+  }
+
+  async data(path?: string) {
+    if (!path) return this.dataState;
+    return path.split(".").reduce<unknown>(
+      (value, key) => (value as Record<string, unknown> | undefined)?.[key],
+      this.dataState,
+    );
+  }
+
+  override property(name: string) {
+    if (name === "config") return Promise.resolve(null);
+    if (name in this.dataState) return Promise.resolve(this.dataState[name]);
+    return super.property(name);
+  }
+
+  async setData(data: unknown) {
+    Object.assign(this.dataState, data);
+  }
+
+  async callMethod(method: string, ...args: unknown[]) {
+    return { method, args, data: this.dataState };
+  }
+}
+
 export class FakePage implements MiniPage {
   dataState: Record<string, unknown> = { loading: false, order: { id: 1 } };
 
@@ -71,6 +124,12 @@ export class FakePage implements MiniPage {
     readonly elements: FakeElement[] = [
       new FakeElement("button", { id: "submit", class: "primary" }, "提交", { left: 10, top: 20, width: 120, height: 44 }),
       new FakeElement("input", { "data-testid": "reason" }, ""),
+      new FakeCustomElement(
+        "custom-card",
+        { id: "card" },
+        "卡片",
+        [new FakeElement("button", { id: "nested" }, "内部按钮")],
+      ),
     ],
   ) {}
 

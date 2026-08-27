@@ -1,7 +1,7 @@
 import { mkdir } from "node:fs/promises";
 import { dirname } from "node:path";
 
-import { captureSemanticSnapshot } from "./snapshot.js";
+import { captureSemanticElements, captureSemanticSnapshot } from "./snapshot.js";
 import { resolveElement } from "./element-resolver.js";
 import type { SessionManager } from "./session-manager.js";
 import type { RpcRequest, SessionOptions, SnapshotOptions, WaitOptions, WechatideCall } from "./types.js";
@@ -51,6 +51,10 @@ export class RpcHandler {
         return this.snapshot(request);
       case "page.query":
         return this.snapshot(request, { selector: requiredString(params, "selector") });
+      case "page.count":
+        return this.elementCount(request);
+      case "page.exists":
+        return (await this.elementCount(request)) > 0;
       case "page.click":
         return this.elementAction(request, "click");
       case "page.fill":
@@ -63,6 +67,8 @@ export class RpcHandler {
         return this.elementRead(request, "wxml");
       case "page.attribute":
         return this.elementRead(request, "attribute");
+      case "element.property":
+        return this.elementProperty(request);
       case "page.style":
         return this.elementRead(request, "style");
       case "page.data":
@@ -71,6 +77,14 @@ export class RpcHandler {
         return this.currentPage(request).then((page) => page.setData(params.data));
       case "page.callMethod":
         return this.currentPage(request).then((page) => page.callMethod(requiredString(params, "method"), ...arrayParam(params, "args")));
+      case "component.query":
+        return this.componentQuery(request);
+      case "component.data":
+        return this.componentData(request);
+      case "component.setData":
+        return this.componentSetData(request);
+      case "component.callMethod":
+        return this.componentCallMethod(request);
       case "wait.selector":
         return this.waitSelector(request);
       case "wait.route":
@@ -142,6 +156,64 @@ export class RpcHandler {
     });
   }
 
+  private async elementCount(request: RpcRequest) {
+    const page = await this.currentPage(request);
+    return (await page.$$(requiredString(request.params || {}, "selector"))).length;
+  }
+
+  private async componentQuery(request: RpcRequest) {
+    const params = request.params || {};
+    const session = this.session(request);
+    const page = await this.currentPage(request);
+    const parent = await resolveElement(
+      session,
+      requiredString(params, "target"),
+      waitOptions(params),
+    );
+    const options = (params.options || {}) as SnapshotOptions;
+    if (typeof parent.$$ !== "function") {
+      throw new Error(`${requiredString(params, "target")} does not support nested queries`);
+    }
+    const elements = await parent.$$(requiredString(params, "selector"));
+    return captureSemanticElements(page, elements, session.registry, options);
+  }
+
+  private async componentData(request: RpcRequest) {
+    const params = request.params || {};
+    const element = await this.customComponent(request);
+    return element.data!(optionalString(params, "path"));
+  }
+
+  private async componentSetData(request: RpcRequest) {
+    const element = await this.customComponent(request);
+    await element.setData!(request.params?.data);
+    return { done: true };
+  }
+
+  private async componentCallMethod(request: RpcRequest) {
+    const params = request.params || {};
+    const element = await this.customComponent(request);
+    return element.callMethod!(requiredString(params, "method"), ...arrayParam(params, "args"));
+  }
+
+  private async customComponent(request: RpcRequest) {
+    const params = request.params || {};
+    const element = await resolveElement(
+      this.session(request),
+      requiredString(params, "target"),
+      waitOptions(params),
+    );
+    if (
+      !element.isCustomComponent ||
+      typeof element.data !== "function" ||
+      typeof element.setData !== "function" ||
+      typeof element.callMethod !== "function"
+    ) {
+      throw new Error(`${requiredString(params, "target")} is not a custom component`);
+    }
+    return element;
+  }
+
   private async elementAction(request: RpcRequest, action: "click" | "fill") {
     const params = request.params || {};
     const element = await resolveElement(this.session(request), requiredString(params, "target"), waitOptions(params));
@@ -154,6 +226,22 @@ export class RpcHandler {
     else if (typeof element.trigger === "function") await element.trigger("input", { value });
     else throw new Error(`Element ${requiredString(params, "target")} does not support input`);
     return { done: true };
+  }
+
+  private async elementProperty(request: RpcRequest) {
+    const params = request.params || {};
+    const element = await resolveElement(this.session(request), requiredString(params, "target"), waitOptions(params));
+    const name = requiredString(params, "name");
+    const value = await element.property(name);
+    if (
+      (value == null || (typeof value === "string" && /^\[object [^\]]+\]$/.test(value))) &&
+      element.isCustomComponent &&
+      typeof element.data === "function"
+    ) {
+      const dataValue = await element.data(toCamelCase(name));
+      if (dataValue !== undefined) return dataValue;
+    }
+    return value;
   }
 
   private async elementRead(request: RpcRequest, action: "text" | "value" | "wxml" | "attribute" | "style") {
@@ -249,6 +337,10 @@ function optionalString(params: Record<string, unknown>, key: string) {
   if (value === undefined || value === null) return undefined;
   if (typeof value !== "string") throw new Error(`${key} must be a string`);
   return value;
+}
+
+function toCamelCase(value: string) {
+  return value.replace(/-([a-z])/g, (_, letter: string) => letter.toUpperCase());
 }
 
 function requiredBoolean(params: Record<string, unknown>, key: string) {

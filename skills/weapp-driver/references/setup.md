@@ -82,6 +82,8 @@ Use `WEAPP_PROJECT` for a default project and `WEAPP_DRIVER_SOCKET` to override 
 
 Default launch mode lets `miniprogram-automator` start/connect DevTools from `projectPath`.
 
+The runtime keeps project sessions in its daemon. If the preferred Automator port is already open, it probes the endpoint and reuses it only when the runtime AppID matches `ext.json` or `project.config.json`. This avoids repeating the DevTools authorization flow after a daemon restart while preventing accidental attachment to another app.
+
 Connect to an existing automation WebSocket when available:
 
 ```js

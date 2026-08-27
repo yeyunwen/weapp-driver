@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
-import { access, constants, mkdir, writeFile } from "node:fs/promises";
-import { createServer } from "node:net";
+import { access, constants, mkdir, readFile, writeFile } from "node:fs/promises";
+import { createConnection, createServer } from "node:net";
 import { dirname } from "node:path";
 import { spawn } from "node:child_process";
 
@@ -29,7 +29,12 @@ type ElementDescriptor = {
 export class AutomatorBackendFactory implements BackendFactory {
   async connect(projectPath: string, options: SessionOptions): Promise<MiniSessionBackend> {
     if (options.wsEndpoint) return AutomatorSession.connect(options.wsEndpoint);
-    const port = await choosePort(options.port ?? 9420, options.port !== undefined);
+    const preferredPort = options.port ?? 9420;
+    if (!(await portAvailable(preferredPort))) {
+      const existing = await reuseExistingSession(projectPath, preferredPort);
+      if (existing) return existing;
+    }
+    const port = await choosePort(preferredPort, options.port !== undefined);
     const cliPath = await resolveCliPath(options.cliPath || defaultCliPath());
     const args = [
       ...(options.args || []),
@@ -72,7 +77,12 @@ export class AutomatorBackendFactory implements BackendFactory {
 }
 
 class AutomatorConnection extends EventEmitter {
-  private readonly pending = new Map<string, { resolve(value: Record<string, unknown>): void; reject(error: unknown): void; timer: NodeJS.Timeout }>();
+  private readonly pending = new Map<string, {
+    method: string;
+    resolve(value: Record<string, unknown>): void;
+    reject(error: unknown): void;
+    timer: NodeJS.Timeout;
+  }>();
   private closed = false;
 
   private constructor(private readonly socket: WebSocket) {
@@ -82,27 +92,41 @@ class AutomatorConnection extends EventEmitter {
     socket.on("error", (error) => this.emit("socketError", error));
   }
 
-  static connect(endpoint: string) {
+  static connect(endpoint: string, timeoutMs = 20_000) {
     return new Promise<AutomatorConnection>((resolvePromise, reject) => {
       const socket = new WebSocket(endpoint);
-      const onError = (error: Error) => reject(error);
-      socket.once("error", onError);
-      socket.once("open", () => {
+      const timer = setTimeout(() => {
+        cleanup();
+        socket.terminate();
+        reject(new Error(`Timed out connecting to Automator endpoint ${endpoint}`));
+      }, timeoutMs);
+      const cleanup = () => {
+        clearTimeout(timer);
         socket.off("error", onError);
+        socket.off("open", onOpen);
+      };
+      const onError = (error: Error) => {
+        cleanup();
+        reject(error);
+      };
+      const onOpen = () => {
+        cleanup();
         resolvePromise(new AutomatorConnection(socket));
-      });
+      };
+      socket.once("error", onError);
+      socket.once("open", onOpen);
     });
   }
 
-  send(method: string, params: Record<string, unknown> = {}) {
+  send(method: string, params: Record<string, unknown> = {}, timeoutMs = 20_000) {
     if (this.closed || this.socket.readyState !== WebSocket.OPEN) return Promise.reject(new Error("Connection closed, check if WeChat DevTools is still running"));
     const id = randomUUID();
     return new Promise<Record<string, unknown>>((resolvePromise, reject) => {
       const timer = setTimeout(() => {
         this.pending.delete(id);
         reject(new Error(`Automator protocol timed out: ${method}`));
-      }, 20_000);
-      this.pending.set(id, { resolve: resolvePromise, reject, timer });
+      }, timeoutMs);
+      this.pending.set(id, { method, resolve: resolvePromise, reject, timer });
       this.socket.send(JSON.stringify({ id, method, params }), (error) => {
         if (!error) return;
         const pending = this.pending.get(id);
@@ -131,7 +155,9 @@ class AutomatorConnection extends EventEmitter {
       if (!pending) return;
       this.pending.delete(message.id);
       clearTimeout(pending.timer);
-      if (message.error) pending.reject(new Error(message.error.message || "Automator protocol error"));
+      if (message.error) {
+        pending.reject(new Error(`${pending.method}: ${message.error.message || "Automator protocol error"}`));
+      }
       else pending.resolve(message.result || {});
       return;
     }
@@ -161,12 +187,12 @@ class AutomatorSession implements MiniSessionBackend {
     connection.on("App.exceptionThrown", (payload) => this.record("exception", payload));
   }
 
-  static async connect(endpoint: string) {
-    const connection = await AutomatorConnection.connect(endpoint);
+  static async connect(endpoint: string, timeoutMs = 20_000) {
+    const connection = await AutomatorConnection.connect(endpoint, timeoutMs);
     const session = new AutomatorSession(connection);
     try {
-      await connection.send("App.enableLog").catch(() => undefined);
-      await session.checkVersion();
+      await connection.send("App.enableLog", {}, timeoutMs).catch(() => undefined);
+      await session.checkVersion(timeoutMs);
       return session;
     } catch (error) {
       connection.close();
@@ -255,8 +281,8 @@ class AutomatorSession implements MiniSessionBackend {
     return page;
   }
 
-  private async checkVersion() {
-    const result: Record<string, unknown> = await this.connection.send("Tool.getInfo").catch(() => ({}));
+  private async checkVersion(timeoutMs = 20_000) {
+    const result: Record<string, unknown> = await this.connection.send("Tool.getInfo", {}, timeoutMs).catch(() => ({}));
     const version = String(result.SDKVersion || "");
     if (version && version !== "dev" && compareVersion(version, "2.7.3") < 0) {
       throw new Error(`Mini Program base library ${version} is too old; 2.7.3 or newer is required`);
@@ -341,6 +367,7 @@ class ProtocolPage implements MiniPage {
 
 class ProtocolElement implements MiniElement {
   readonly tagName: string;
+  readonly isCustomComponent: boolean;
 
   constructor(
     private readonly connection: AutomatorConnection,
@@ -348,6 +375,26 @@ class ProtocolElement implements MiniElement {
     private readonly descriptor: ElementDescriptor,
   ) {
     this.tagName = descriptor.tagName;
+    this.isCustomComponent = Boolean(descriptor.nodeId);
+  }
+
+  async $(selector: string) {
+    try {
+      const result = await this.send("Element.getElement", { selector });
+      return new ProtocolElement(this.connection, this.pageId, result as unknown as ElementDescriptor);
+    } catch {
+      return null;
+    }
+  }
+
+  async $$(selector: string) {
+    const result = await this.send("Element.getElements", { selector });
+    const elements = Array.isArray(result.elements) ? result.elements : [];
+    return elements.map((entry) => new ProtocolElement(
+      this.connection,
+      this.pageId,
+      entry as ElementDescriptor,
+    ));
   }
 
   async text() {
@@ -403,6 +450,23 @@ class ProtocolElement implements MiniElement {
     return String(result.wxml || "");
   }
 
+  async data(path?: string) {
+    this.assertCustomComponent("data");
+    const result = await this.send("Element.getData", path ? { path } : {});
+    return result.data;
+  }
+
+  async setData(data: unknown) {
+    this.assertCustomComponent("setData");
+    await this.send("Element.setData", { data });
+  }
+
+  async callMethod(method: string, ...args: unknown[]) {
+    this.assertCustomComponent("callMethod");
+    const result = await this.send("Element.callMethod", { method, args });
+    return result.result;
+  }
+
   private async getter(name: string | string[], method: string, resultKey: string) {
     const names = Array.isArray(name) ? name : [name];
     const result = await this.send(method, { names });
@@ -418,6 +482,12 @@ class ProtocolElement implements MiniElement {
       ...(this.descriptor.nodeId ? { nodeId: this.descriptor.nodeId } : {}),
       ...(this.descriptor.videoId ? { videoId: this.descriptor.videoId } : {}),
     });
+  }
+
+  private assertCustomComponent(action: string) {
+    if (!this.isCustomComponent) {
+      throw new Error(`${this.tagName} is not a custom component and does not support ${action}`);
+    }
   }
 }
 
@@ -464,11 +534,78 @@ async function choosePort(preferred: number, strict: boolean) {
   });
 }
 
-function portAvailable(port: number) {
+async function reuseExistingSession(projectPath: string, port: number) {
+  let session: AutomatorSession | undefined;
+  try {
+    session = await AutomatorSession.connect(`ws://127.0.0.1:${port}`, 1_500);
+    const expectedAppIds = await projectAppIds(projectPath);
+    if (expectedAppIds.size === 0) {
+      await session.close();
+      return undefined;
+    }
+    const accountInfo = await session.callWx("getAccountInfoSync");
+    const actualAppId = runtimeAppId(accountInfo);
+    if (!actualAppId || !expectedAppIds.has(actualAppId)) {
+      await session.close();
+      return undefined;
+    }
+    return session;
+  } catch {
+    await session?.close().catch(() => undefined);
+    return undefined;
+  }
+}
+
+async function projectAppIds(projectPath: string) {
+  const appIds = new Set<string>();
+  for (const file of ["ext.json", "project.config.json"]) {
+    try {
+      const value = JSON.parse(await readFile(`${projectPath}/${file}`, "utf8")) as Record<string, unknown>;
+      for (const candidate of [
+        value.extAppid,
+        value.appid,
+        (value.ext as Record<string, unknown> | undefined)?.appId,
+      ]) {
+        if (typeof candidate === "string" && candidate) appIds.add(candidate);
+      }
+    } catch {
+      // This metadata file cannot identify the running project.
+    }
+  }
+  return appIds;
+}
+
+function runtimeAppId(value: unknown) {
+  if (!value || typeof value !== "object") return undefined;
+  const miniProgram = (value as Record<string, unknown>).miniProgram;
+  if (!miniProgram || typeof miniProgram !== "object") return undefined;
+  const appId = (miniProgram as Record<string, unknown>).appId;
+  return typeof appId === "string" ? appId : undefined;
+}
+
+async function portAvailable(port: number) {
+  if (await portAcceptsConnections(port)) return false;
   return new Promise<boolean>((resolvePromise) => {
     const server = createServer();
     server.once("error", () => resolvePromise(false));
     server.listen(port, "127.0.0.1", () => server.close(() => resolvePromise(true)));
+  });
+}
+
+function portAcceptsConnections(port: number) {
+  return new Promise<boolean>((resolvePromise) => {
+    const socket = createConnection({ host: "127.0.0.1", port });
+    let settled = false;
+    const finish = (value: boolean) => {
+      if (settled) return;
+      settled = true;
+      socket.destroy();
+      resolvePromise(value);
+    };
+    socket.setTimeout(300);
+    socket.once("connect", () => finish(true));
+    socket.once("error", () => finish(false));
+    socket.once("timeout", () => finish(false));
   });
 }
 

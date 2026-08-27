@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import { EventEmitter } from "node:events";
-import { access, constants, mkdir, writeFile } from "node:fs/promises";
-import { createServer } from "node:net";
+import { access, constants, mkdir, readFile, writeFile } from "node:fs/promises";
+import { createConnection, createServer } from "node:net";
 import { dirname } from "node:path";
 import { spawn } from "node:child_process";
 import WebSocket from "ws";
@@ -10,7 +10,13 @@ export class AutomatorBackendFactory {
     async connect(projectPath, options) {
         if (options.wsEndpoint)
             return AutomatorSession.connect(options.wsEndpoint);
-        const port = await choosePort(options.port ?? 9420, options.port !== undefined);
+        const preferredPort = options.port ?? 9420;
+        if (!(await portAvailable(preferredPort))) {
+            const existing = await reuseExistingSession(projectPath, preferredPort);
+            if (existing)
+                return existing;
+        }
+        const port = await choosePort(preferredPort, options.port !== undefined);
         const cliPath = await resolveCliPath(options.cliPath || defaultCliPath());
         const args = [
             ...(options.args || []),
@@ -66,18 +72,32 @@ class AutomatorConnection extends EventEmitter {
         socket.on("close", () => this.onClose());
         socket.on("error", (error) => this.emit("socketError", error));
     }
-    static connect(endpoint) {
+    static connect(endpoint, timeoutMs = 20_000) {
         return new Promise((resolvePromise, reject) => {
             const socket = new WebSocket(endpoint);
-            const onError = (error) => reject(error);
-            socket.once("error", onError);
-            socket.once("open", () => {
+            const timer = setTimeout(() => {
+                cleanup();
+                socket.terminate();
+                reject(new Error(`Timed out connecting to Automator endpoint ${endpoint}`));
+            }, timeoutMs);
+            const cleanup = () => {
+                clearTimeout(timer);
                 socket.off("error", onError);
+                socket.off("open", onOpen);
+            };
+            const onError = (error) => {
+                cleanup();
+                reject(error);
+            };
+            const onOpen = () => {
+                cleanup();
                 resolvePromise(new AutomatorConnection(socket));
-            });
+            };
+            socket.once("error", onError);
+            socket.once("open", onOpen);
         });
     }
-    send(method, params = {}) {
+    send(method, params = {}, timeoutMs = 20_000) {
         if (this.closed || this.socket.readyState !== WebSocket.OPEN)
             return Promise.reject(new Error("Connection closed, check if WeChat DevTools is still running"));
         const id = randomUUID();
@@ -85,8 +105,8 @@ class AutomatorConnection extends EventEmitter {
             const timer = setTimeout(() => {
                 this.pending.delete(id);
                 reject(new Error(`Automator protocol timed out: ${method}`));
-            }, 20_000);
-            this.pending.set(id, { resolve: resolvePromise, reject, timer });
+            }, timeoutMs);
+            this.pending.set(id, { method, resolve: resolvePromise, reject, timer });
             this.socket.send(JSON.stringify({ id, method, params }), (error) => {
                 if (!error)
                     return;
@@ -117,8 +137,9 @@ class AutomatorConnection extends EventEmitter {
                 return;
             this.pending.delete(message.id);
             clearTimeout(pending.timer);
-            if (message.error)
-                pending.reject(new Error(message.error.message || "Automator protocol error"));
+            if (message.error) {
+                pending.reject(new Error(`${pending.method}: ${message.error.message || "Automator protocol error"}`));
+            }
             else
                 pending.resolve(message.result || {});
             return;
@@ -149,12 +170,12 @@ class AutomatorSession {
         connection.on("App.logAdded", (payload) => this.record("console", payload));
         connection.on("App.exceptionThrown", (payload) => this.record("exception", payload));
     }
-    static async connect(endpoint) {
-        const connection = await AutomatorConnection.connect(endpoint);
+    static async connect(endpoint, timeoutMs = 20_000) {
+        const connection = await AutomatorConnection.connect(endpoint, timeoutMs);
         const session = new AutomatorSession(connection);
         try {
-            await connection.send("App.enableLog").catch(() => undefined);
-            await session.checkVersion();
+            await connection.send("App.enableLog", {}, timeoutMs).catch(() => undefined);
+            await session.checkVersion(timeoutMs);
             return session;
         }
         catch (error) {
@@ -234,8 +255,8 @@ class AutomatorSession {
         }
         return page;
     }
-    async checkVersion() {
-        const result = await this.connection.send("Tool.getInfo").catch(() => ({}));
+    async checkVersion(timeoutMs = 20_000) {
+        const result = await this.connection.send("Tool.getInfo", {}, timeoutMs).catch(() => ({}));
         const version = String(result.SDKVersion || "");
         if (version && version !== "dev" && compareVersion(version, "2.7.3") < 0) {
             throw new Error(`Mini Program base library ${version} is too old; 2.7.3 or newer is required`);
@@ -319,11 +340,27 @@ class ProtocolElement {
     pageId;
     descriptor;
     tagName;
+    isCustomComponent;
     constructor(connection, pageId, descriptor) {
         this.connection = connection;
         this.pageId = pageId;
         this.descriptor = descriptor;
         this.tagName = descriptor.tagName;
+        this.isCustomComponent = Boolean(descriptor.nodeId);
+    }
+    async $(selector) {
+        try {
+            const result = await this.send("Element.getElement", { selector });
+            return new ProtocolElement(this.connection, this.pageId, result);
+        }
+        catch {
+            return null;
+        }
+    }
+    async $$(selector) {
+        const result = await this.send("Element.getElements", { selector });
+        const elements = Array.isArray(result.elements) ? result.elements : [];
+        return elements.map((entry) => new ProtocolElement(this.connection, this.pageId, entry));
     }
     async text() {
         return String(await this.getter("innerText", "Element.getDOMProperties", "properties"));
@@ -367,6 +404,20 @@ class ProtocolElement {
         const result = await this.send("Element.getWXML", { type: "inner" });
         return String(result.wxml || "");
     }
+    async data(path) {
+        this.assertCustomComponent("data");
+        const result = await this.send("Element.getData", path ? { path } : {});
+        return result.data;
+    }
+    async setData(data) {
+        this.assertCustomComponent("setData");
+        await this.send("Element.setData", { data });
+    }
+    async callMethod(method, ...args) {
+        this.assertCustomComponent("callMethod");
+        const result = await this.send("Element.callMethod", { method, args });
+        return result.result;
+    }
     async getter(name, method, resultKey) {
         const names = Array.isArray(name) ? name : [name];
         const result = await this.send(method, { names });
@@ -381,6 +432,11 @@ class ProtocolElement {
             ...(this.descriptor.nodeId ? { nodeId: this.descriptor.nodeId } : {}),
             ...(this.descriptor.videoId ? { videoId: this.descriptor.videoId } : {}),
         });
+    }
+    assertCustomComponent(action) {
+        if (!this.isCustomComponent) {
+            throw new Error(`${this.tagName} is not a custom component and does not support ${action}`);
+        }
     }
 }
 function defaultCliPath() {
@@ -428,11 +484,81 @@ async function choosePort(preferred, strict) {
         });
     });
 }
-function portAvailable(port) {
+async function reuseExistingSession(projectPath, port) {
+    let session;
+    try {
+        session = await AutomatorSession.connect(`ws://127.0.0.1:${port}`, 1_500);
+        const expectedAppIds = await projectAppIds(projectPath);
+        if (expectedAppIds.size === 0) {
+            await session.close();
+            return undefined;
+        }
+        const accountInfo = await session.callWx("getAccountInfoSync");
+        const actualAppId = runtimeAppId(accountInfo);
+        if (!actualAppId || !expectedAppIds.has(actualAppId)) {
+            await session.close();
+            return undefined;
+        }
+        return session;
+    }
+    catch {
+        await session?.close().catch(() => undefined);
+        return undefined;
+    }
+}
+async function projectAppIds(projectPath) {
+    const appIds = new Set();
+    for (const file of ["ext.json", "project.config.json"]) {
+        try {
+            const value = JSON.parse(await readFile(`${projectPath}/${file}`, "utf8"));
+            for (const candidate of [
+                value.extAppid,
+                value.appid,
+                value.ext?.appId,
+            ]) {
+                if (typeof candidate === "string" && candidate)
+                    appIds.add(candidate);
+            }
+        }
+        catch {
+            // This metadata file cannot identify the running project.
+        }
+    }
+    return appIds;
+}
+function runtimeAppId(value) {
+    if (!value || typeof value !== "object")
+        return undefined;
+    const miniProgram = value.miniProgram;
+    if (!miniProgram || typeof miniProgram !== "object")
+        return undefined;
+    const appId = miniProgram.appId;
+    return typeof appId === "string" ? appId : undefined;
+}
+async function portAvailable(port) {
+    if (await portAcceptsConnections(port))
+        return false;
     return new Promise((resolvePromise) => {
         const server = createServer();
         server.once("error", () => resolvePromise(false));
         server.listen(port, "127.0.0.1", () => server.close(() => resolvePromise(true)));
+    });
+}
+function portAcceptsConnections(port) {
+    return new Promise((resolvePromise) => {
+        const socket = createConnection({ host: "127.0.0.1", port });
+        let settled = false;
+        const finish = (value) => {
+            if (settled)
+                return;
+            settled = true;
+            socket.destroy();
+            resolvePromise(value);
+        };
+        socket.setTimeout(300);
+        socket.once("connect", () => finish(true));
+        socket.once("error", () => finish(false));
+        socket.once("timeout", () => finish(false));
     });
 }
 function compareVersion(left, right) {
